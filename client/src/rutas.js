@@ -11,20 +11,34 @@ const rutas = express.Router();
 rutas.get('/', (req, res) => {
   const autenticado = Boolean(req.session.token_acceso);
   const payload = autenticado ? decodificarJwt(req.session.token_acceso) : null;
-  const cuerpo = autenticado
-    ? `<div class="text-center">
-         <h1 class="mb-3">Bienvenido</h1>
-         <p class="muted">Tu sesión está activa.</p>
-         <div class="d-flex gap-2 justify-content-center">
-           <a class="btn btn-primary" href="/dashboard">Ir al dashboard</a>
-           <a class="btn btn-outline-danger" href="/logout">Cerrar sesión</a>
-         </div>
-       </div>`
-    : `<div class="text-center">
-         <h1 class="mb-3">Demo SSO Client</h1>
-         <p class="muted">Inicia sesión para continuar</p>
-         <a class="btn btn-primary btn-lg" href="/login">Login con IdP</a>
-       </div>`;
+  const nombre = payload?.name ? escaparHtml(payload.name) : 'Usuario';
+
+  // Usaremos un diseño de tarjeta (card) de Bootstrap para ambas vistas
+  const cuerpo = `
+    <div class="row">
+      <div class="col-md-8 col-lg-6 mx-auto">
+        <div class="card shadow-sm">
+          <div class="card-body text-center p-4 p-md-5">
+            ${autenticado
+              ? `
+                <h1 class="mb-3">Bienvenido, ${nombre}</h1>
+                <p class="fs-5 muted">Tu sesión está activa.</p>
+                <div class="d-flex gap-2 justify-content-center">
+                  <a class="btn btn-primary" href="/dashboard">Ir al dashboard</a>
+                  <a class="btn btn-outline-danger" href="/logout">Cerrar sesión</a>
+                </div>
+              `
+              : `
+                <h1 class="mb-3">Demo SSO Client</h1>
+                <p class="fs-5 muted">Inicia sesión para continuar</p>
+                <a class="btn btn-primary btn-lg" href="/login">Login con IdP</a>
+              `
+            }
+          </div>
+        </div>
+      </div>
+    </div>`;
+
   res.set('Content-Type', 'text/html; charset=utf-8');
   res.send(renderizarPagina('Inicio', cuerpo, payload ? { name: payload.name, email: payload.email } : null));
 });
@@ -76,7 +90,7 @@ rutas.get('/callback', async (req, res) => {
   res.redirect('/dashboard');
 });
 
-// Dashboard protegido
+// Dashboard protegido (MODIFICADO para GUI)
 rutas.get('/dashboard', exigirAutenticacionPagina, (req, res) => {
   const token = req.session.token_acceso;
   const payload = decodificarJwt(token);
@@ -105,7 +119,8 @@ rutas.get('/dashboard', exigirAutenticacionPagina, (req, res) => {
           </div>
 
           <div class="row g-3">
-            <div class="col-md-6">
+            
+            <div class="col-md-6 col-lg-4">
               <div class="card shadow-sm h-100">
                 <div class="card-body">
                   <h5 class="card-title">Acciones</h5>
@@ -117,7 +132,20 @@ rutas.get('/dashboard', exigirAutenticacionPagina, (req, res) => {
                 </div>
               </div>
             </div>
-            <div class="col-md-6">
+            
+            <div class="col-md-6 col-lg-4">
+              <div class="card shadow-sm h-100">
+                <div class="card-body">
+                  <h5 class="card-title">Configuración</h5>
+                  <p class="card-text muted">Ajusta tus preferencias de visualización.</p>
+                  <div class="d-flex gap-2">
+                    <a class="btn btn-outline-info" href="/settings">Ir a Configuración</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4">
               <div class="card shadow-sm h-100">
                 <div class="card-body">
                   <h5 class="card-title">Token</h5>
@@ -129,6 +157,7 @@ rutas.get('/dashboard', exigirAutenticacionPagina, (req, res) => {
                 </div>
               </div>
             </div>
+
           </div>
         </div>
       </div>
@@ -180,6 +209,74 @@ rutas.get('/me', exigirAutenticacionPagina, (req, res) => {
   );
 });
 
+// Página de Configuración
+rutas.get('/settings', exigirAutenticacionPagina, (req, res) => {
+  const payload = decodificarJwt(req.session.token_acceso);
+  res.set('Content-Type', 'text/html; charset=utf-8');
+  establecerNoCache(res);
+  res.send(
+    renderizarPagina(
+      'Configuración',
+      `
+      <div class="row">
+        <div class="col-lg-8 mx-auto">
+          <div class="card shadow-sm">
+            <div class="card-body">
+              <h3 class="card-title mb-3">Configuración de la Cuenta</h3>
+              <p class="muted">Hola, ${escaparHtml(payload?.name || 'Usuario')}.</p>
+              
+              <div class="mb-3">
+                <label class="form-label">Tema</label>
+                <p class="muted small">Elige tu preferencia visual (claro u oscuro).</p>
+                <button id="btn-theme-toggle" class="btn btn-primary">Cargando...</button>
+              </div>
+
+            </div>
+          </div>
+          <div class="mt-3 d-flex gap-2">
+            <a class="btn btn-primary" href="/dashboard">Volver al dashboard</a>
+          </div>
+        </div>
+      </div>
+      
+      <script>
+        (function() {
+          var btn = document.getElementById('btn-theme-toggle');
+          var htmlEl = document.documentElement;
+
+          function updateButtonText() {
+            if (htmlEl.classList.contains('light-theme')) {
+              btn.textContent = 'Cambiar a Tema Oscuro';
+            } else {
+              btn.textContent = 'Cambiar a Tema Claro';
+            }
+          }
+
+          // Set initial button text on load
+          updateButtonText();
+
+          // Add click listener
+          btn.addEventListener('click', function() {
+            if (htmlEl.classList.contains('light-theme')) {
+              // Switch to dark
+              htmlEl.classList.remove('light-theme');
+              localStorage.setItem('sso-theme', 'dark');
+            } else {
+              // Switch to light
+              htmlEl.classList.add('light-theme');
+              localStorage.setItem('sso-theme', 'light');
+            }
+            // Update text after click
+            updateButtonText();
+          });
+        })();
+      </script>
+      `
+    , { name: payload?.name || 'Usuario', email: payload?.email || '' })
+  );
+});
+
+
 // Cerrar sesión local y en el IdP
 rutas.get('/logout', (req, res) => {
   const idpLogout = `${URL_IDP}/logout`;
@@ -196,4 +293,3 @@ rutas.get('/api/perfil', exigirAutenticacionApi, (req, res) => {
 });
 
 export default rutas;
-

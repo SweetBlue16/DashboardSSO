@@ -19,35 +19,108 @@ function requireLoginApi(req, res, next) {
 
 // Página de inicio mínima del IdP
 router.get('/', (req, res) => {
-  if (req.session.user) {
-    res.send(`
-      <h1>IdP</h1>
-      <p>Sesión activa como <strong>${req.session.user.email}</strong></p>
-      <p>
-        <a href="/me">Ver perfil</a> ·
-        <a href="/userinfo">/userinfo</a> ·
-        <a href="/logout">Cerrar sesión</a>
-      </p>
-    `);
-  } else {
-    res.send(`
-      <h1>IdP</h1>
-      <p>No has iniciado sesión.</p>
-      <p><a href="/login">Ir al login</a></p>
-    `);
-  }
+  const user = req.session.user;
+  const userEmail = user ? String(user.email).replace(/"/g, '&quot;') : '';
+
+  res.send(`
+    <!doctype html>
+    <html lang="es">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>IdP - Inicio</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>
+          /* Mismos estilos oscuros */
+          body { background-color: #0f172a; color: #e2e8f0; }
+          .card { background: #111827; border-color: #1f2937; }
+          .muted { color: #94a3b8; }
+          a { text-decoration: none; }
+        </style>
+      </head>
+      <body class="d-flex align-items-center" style="min-height: 90vh;">
+        <main class="container">
+          <div class="row">
+            <div class="col-md-6 col-lg-5 mx-auto">
+              <div class="card shadow-sm">
+                <div class="card-body p-4 p-md-5 text-center">
+                  <h1 class="h3 mb-4">IdP Home</h1>
+                  ${user ? `
+                    <p class="fs-5 muted">Sesión activa como:</p>
+                    <p class="fs-5"><strong>${userEmail}</strong></p>
+                    <a href="/logout" class="btn btn-outline-danger w-100 mt-3">Cerrar sesión</a>
+                    <p class="mt-4 mb-0">
+                      <a href="/me" class="muted small">Ver perfil (JSON)</a>
+                    </p>
+                  ` : `
+                    <p class="fs-5 muted">No has iniciado sesión.</p>
+                    <a href="/login" class="btn btn-primary w-100 btn-lg mt-3">Ir al Login</a>
+                  `}
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </body>
+    </html>
+  `);
 });
 
 // Login form (GET)
 router.get('/login', (req, res) => {
+  const returnTo = String(req.query.returnTo || '').replace(/"/g, '&quot;');
   res.send(`
-    <h1>IdP - Login</h1>
-    <form method="post" action="/login">
-      <input name="email" placeholder="email" value="demo@lab.local"/><br/>
-      <input name="password" type="password" placeholder="password" value="demo"/><br/>
-      <input type="hidden" name="returnTo" value="${req.query.returnTo || ''}"/>
-      <button>Entrar</button>
-    </form>
+    <!doctype html>
+    <html lang="es">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>IdP - Login</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>
+          /* Mismos estilos oscuros que el client */
+          body { background-color: #0f172a; color: #e2e8f0; }
+          .card { background: #111827; border-color: #1f2937; }
+          .form-control { 
+            background-color: #1f2937; 
+            border-color: #374151;
+            color: #e2e8f0;
+          }
+          .form-control:focus {
+            background-color: #1f2937;
+            border-color: #4f46e5;
+            color: #e2e8f0;
+            box-shadow: 0 0 0 0.25rem rgba(79, 70, 229, 0.25);
+          }
+          .form-label { color: #94a3b8; }
+        </style>
+      </head>
+      <body class="d-flex align-items-center" style="min-height: 90vh;">
+        <main class="container">
+          <div class="row">
+            <div class="col-md-6 col-lg-4 mx-auto">
+              <div class="card shadow-sm">
+                <div class="card-body p-4 p-md-5">
+                  <h1 class="h3 mb-4 text-center">IdP Login</h1>
+                  <form method="post" action="/login">
+                    <div class="mb-3">
+                      <label for="email" class="form-label">Email</label>
+                      <input id="email" name="email" class="form-control" placeholder="email" value="demo@lab.local" required />
+                    </div>
+                    <div class="mb-3">
+                      <label for="pass" class="form-label">Password</label>
+                      <input id="pass" name="password" type="password" class="form-control" placeholder="password" value="demo" required />
+                    </div>
+                    <input type="hidden" name="returnTo" value="${returnTo}"/>
+                    <button class="btn btn-primary w-100 btn-lg mt-3">Entrar</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </body>
+    </html>
   `);
 });
 
@@ -58,7 +131,7 @@ router.post('/login', (req, res) => {
   if (!user || user.password !== password) return res.status(401).send('Credenciales inválidas');
   // Carga mínima en sesión
   req.session.user = { id: user.id, email: user.email, name: user.name };
-  res.redirect(returnTo || '/me');
+  res.redirect(returnTo || '/');
 });
 
 router.get('/me', requireLoginPage, (req, res) => {
